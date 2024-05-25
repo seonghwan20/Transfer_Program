@@ -5,7 +5,7 @@ from matplotlib import rc
 import copy
 
 
-font_name = fm.FontProperties(fname=r"C:\Users\Hwan\Desktop\project\nanum-gothic\NGULIM.TTF").get_name() #matplot 한글 깨짐 방지를 위해 폰트 설치
+font_name = fm.FontProperties(fname=r"C:\Users\Hwan\Transfer_Program\nanum-gothic\NGULIM.TTF").get_name() #matplot 한글 깨짐 방지를 위해 폰트 설치
 rc('font', family=font_name)
 
 
@@ -83,8 +83,39 @@ if end_point in trans_list:
 else:
     trans_list.append(end_point)
 
-#아래 반복문을 위한 station list 생성
-excluded_list = copy.deepcopy(trans_list)
+excluded_list = copy.deepcopy(trans_list) #아래 반복문을 위한 station list 생성
+time_travel = 0 #총 소요시간 time_travel 선언
+
+#순환노선의 경우 시계방향(index 방향), 반시계 방향(index의 역방향)의 경우를 따로 계산해 최소시간으로 설정
+def select(current_line_index, idx_station, idx_another_station): 
+    global time_travel
+    time_clockwise = 0
+    time_anticlockwise = 0
+     
+    if idx_another_station < idx_station: #시계방향(index 방향)으로 향할 때의 시간 계산
+        idx_station, idx_another_station = idx_another_station, idx_station
+    for idx in range(idx_station, idx_another_station):
+        time_clockwise += lines_time[current_line_index][idx] 
+     
+    for idx in range(0,idx_station): #반시계방향(index의 역방향)으로 향할 때의 시간 계산
+        time_anticlockwise += lines_time[current_line_index][idx]
+    for idx in range(idx_another_station,43):
+        time_anticlockwise += lines_time[current_line_index][idx]
+    
+    if time_clockwise < time_anticlockwise: #시계방향과 반시계방향중 짧은 시간 선택
+        time_travel = time_clockwise
+    elif time_anticlockwise < time_clockwise:
+        time_travel = time_anticlockwise
+    elif time_clockwise == time_anticlockwise:
+        time_travel = time_clockwise
+        
+#비순환노선의 경우 index 방향으로 계산       
+def time(idx_station, idx_another_station):
+    global time_travel
+    if idx_another_station < idx_station:
+        idx_station, idx_another_station = idx_another_station, idx_station
+    for idx in range(idx_station, idx_another_station):
+        time_travel += lines_time[current_line_index][idx] 
 
 #trans_list에 있는 station 검색하면서 두 역이 같은 line에 있다면 G_trans 그래프의 vertex로 추가
 for station in trans_list:
@@ -92,20 +123,17 @@ for station in trans_list:
     for line in lines_all:
         if station in line:
             for another_station in excluded_list:
-                time_travel = 0
                 if another_station in line:
-                    idx1 = line.index(station)
-                    idx2 = line.index(another_station)
+                    idx_station = line.index(station)
+                    idx_another_station = line.index(another_station)
                     current_line_index = lines_all.index(line)
-                    if idx2 < idx1:
-                        idx1, idx2 = idx2, idx1
-                    for idx in range(idx1, idx2):
-                        time_travel += lines_time[current_line_index][idx] #두 station의 index 찾아 소요시간 구함 (문제점: 2호선 같은 경우는 순환형이라 문제생김.)
+                    if current_line_index == 1 : #2호선의 경우 시계방향(index 순서대로), 반시계 방향(index의 역방향)의 경우를 따로 계산해 최소시간으로 설정
+                        select(current_line_index, idx_station, idx_another_station)
+                    else:
+                        time(idx_station, idx_another_station)
                      
                     G_trans.add_edge(station, another_station, weight = time_travel)
                     time_travel = 0
-
-
 
 #G_trans 그래프 그리기
 pos = nx.spring_layout(G_trans)
